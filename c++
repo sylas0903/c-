@@ -1,3 +1,4 @@
+#상속의 기본형태
 #include <iostream>
 using namespace std;
 
