@@ -122,7 +122,7 @@ int main() {
     return 0;
 }
 
-#과제 외 프로그램 작성
+#다단계 상속
 #include <iostream>
 using namespace std;
 
