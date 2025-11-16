@@ -1,0 +1,221 @@
+## SERVER
+// server.cpp : 간단한 TCP 파일 전송 서버
+// 빌드: cl /EHsc server.cpp ws2_32.lib
+
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define BUFSIZE 365
+#include <winsock2.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+using namespace std;
+
+#pragma comment(lib, "ws2_32.lib")
+
+int main() {
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData); // WinSock 초기화
+
+    SOCKET serverSock = socket(AF_INET, SOCK_STREAM, 0); // TCP 소켓 생성
+
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;  // 모든 IP에서 접속 허용
+    serverAddr.sin_port = htons(9000);        // 포트 번호 9000 사용
+
+    // 소켓에 주소 바인딩
+    bind(serverSock, (SOCKADDR*)&serverAddr, sizeof(serverAddr));
+
+    // 클라이언트 접속 대기
+    listen(serverSock, 1);
+    std::cout << "[서버] 클라이언트 접속 대기 중...\n";
+
+    sockaddr_in clientAddr;
+    int clientAddrSize = sizeof(clientAddr);
+    SOCKET clientSock = accept(serverSock, (SOCKADDR*)&clientAddr, &clientAddrSize);
+    std::cout << "[서버] 클라이언트 접속!\n";
+
+    const char* list[] = { "test.txt","image.png"};
+    int length = sizeof(list) / sizeof(list[0]);
+
+    char buf[BUFSIZE];
+    int retval;
+  
+
+    while (1) {
+        retval = recv(clientSock, buf, BUFSIZE - 1, 0); // 클라이언트로 부터 데이터를 전달받아 buf에 저장
+
+        if (retval <= 0) { // 반환값이 0이면 정상종료 0미만이면 오류
+            break;  
+        }
+
+        buf[retval] = '\0';
+        cout << buf << endl;
+
+        if (strcmp(buf, "list") == 0) { // buf에 저장된 문자열이 list면 내부 실행
+            int count = length; // 파일의 개수 = list 배열 크기
+
+            send(clientSock, (char*)&count, sizeof(count), 0); // 클라이언트에 파일의 개수를 전달
+
+            for (int i = 0; i < length; i++) {
+                int len = strlen(list[i]); // len에 list 배열 각 인덱스의 문자열 길이를 저장
+                send(clientSock, (char*)&len, sizeof(len), 0); // 클라이언트에 문자열 길이 전달
+                send(clientSock, list[i], len, 0); // 클라이언트에 list배열에 저장된 문자열 전달
+            }
+            continue; // while문 맨처음으로 돌아가 recv 대기
+        }
+
+        if (strcmp(buf, "test.txt") == 0 || strcmp(buf, "image.png") == 0) { // buf에 test.txt or image.png가 저장되어 있으면 루프 탈출
+           break;
+        }
+
+    }
+   
+    if(strcmp(buf, "test.txt") == 0){ // buf에 test.txt가 저장되어 있으면 내부 실행
+        std::ifstream file(list[0], std::ios::binary); // list[0]의 파일명을 바이너리 파일로 읽음
+        if (!file) {
+            std::cerr << "[서버] 해당 파일을 열 수 없습니다.\n";
+            closesocket(clientSock);
+            closesocket(serverSock);
+            WSACleanup();
+            return 1;
+        }
+
+        char buffer[1024];
+        while (!file.eof()) {
+            file.read(buffer, sizeof(buffer));
+            int bytesRead = file.gcount();
+            send(clientSock, buffer, bytesRead, 0);
+        }
+        file.close();
+    }
+    else if (strcmp(buf, "image.png") == 0) { // buf에 image.png가 저장되어 있으면 내부 실행
+        std::ifstream file(list[1], std::ios::binary); // list[1]의 파일명을 바이너리 파일로 읽음
+        if (!file) {
+            std::cerr << "[서버] 해당 파일을 열 수 없습니다.\n";
+            closesocket(clientSock);
+            closesocket(serverSock);
+            WSACleanup();
+            return 1;
+        }
+
+        char buffer[1024];
+        while (!file.eof()) {
+            file.read(buffer, sizeof(buffer));
+            int bytesRead = file.gcount();
+            send(clientSock, buffer, bytesRead, 0);
+        }
+        file.close();
+    }
+    
+    std::cout << "[서버] 파일 전송 완료!\n";
+    
+
+    // 정리
+    closesocket(clientSock);
+    closesocket(serverSock);
+    WSACleanup();
+
+    return 0;
+}
+
+
+
+
+
+
+
+
+
+## CLIENT
+// client.cpp : 간단한 TCP 파일 수신 클라이언트
+// 빌드: cl /EHsc client.cpp ws2_32.lib
+
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <winsock2.h>
+#include <iostream>
+#include <fstream>
+using namespace std;
+
+#pragma comment(lib, "ws2_32.lib")
+#define BUFSIZE    512
+
+int main() {
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData); // WinSock 초기화
+
+    SOCKET clientSock = socket(AF_INET, SOCK_STREAM, 0); // TCP 소켓 생성
+
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // 서버 주소 (로컬)
+    serverAddr.sin_port = htons(9000);                   // 서버 포트
+
+    // 서버에 연결 시도
+    if (connect(clientSock, (SOCKADDR*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        std::cerr << "[클라이언트] 서버에 연결할 수 없습니다.\n";
+        closesocket(clientSock);
+        WSACleanup();
+        return 1;
+    }
+
+    std::cout << "[클라이언트] 서버에 연결되었습니다.\n";
+
+    
+    char buf[BUFSIZE + 1];
+    int len;
+
+    while (1) {
+        cin >> buf; // 서버에 전달할 내용을 buf에 저장
+        send(clientSock, buf, strlen(buf), 0); // buf에 저장된 내용을 send() 함수로 전달
+
+        if (strcmp(buf, "list") == 0) { // buf에 저장된 문자열과 list가 동일하면 내부 코드 실행
+            int count;
+            recv(clientSock, (char*)&count, sizeof(count), 0);  // 서버에서 보내는 파일 개수를 전달 받음
+
+            for (int i = 0; i < count; i++) {
+                int len; // 파일명 길이를 저장할 변수
+                recv(clientSock, (char*)&len, sizeof(len), 0);  // 파일명 길이를 전달받음
+
+                int rec = 0; // buf에 연속적으로 저장하기 위한 변수
+                while (rec < len) { // buf의 길이가 rec보다 클 때 까지 반복
+                    int retval = recv(clientSock, buf + rec, len - rec, 0); // buf+ rec: 0번째 인덱스부터 파일명을 저장 len - rec: 저장된 데이터 만큼 buf 길이가 줄어듬
+
+                    if (retval <= 0) { // 반환값이 0이면 정상종료 0미만이면 오류
+                        break;
+                    }
+
+                    rec += retval; // 서버로 부터 전달받은 파일명 길이만큼 rec 증가
+                }
+
+                buf[rec] = '\0';
+                cout << buf << endl;  
+            }
+            continue; // while문 처음으로 돌아감
+        } 
+        if (strcmp(buf, "test.txt") == 0 || strcmp(buf, "image.png") == 0) { // buf에 저장된 문자열이 test.txt or image.png면 루프 빠져나옴
+            break;  
+        }
+    }
+
+
+        // 수신한 데이터를 파일로 저장
+        std::ofstream outFile("file", std::ios::binary);
+        char buffer[1024];
+        int bytesReceived;
+
+        while ((bytesReceived = recv(clientSock, buffer, sizeof(buffer), 0)) > 0) {
+            outFile.write(buffer, bytesReceived);
+        }
+        
+
+    std::cout << "[클라이언트] 파일 수신 완료!\n";
+    
+    
+    // 정리
+    outFile.close();
+    closesocket(clientSock);
+    WSACleanup();
+
+    return 0;
+}
