@@ -111,3 +111,49 @@ int main()
     v1.print(); // v1객체의 벡터의 0번째 요소 값 출력
     v2.print(); // v2객체의 벡터의 0번째 요소 값 출력
 }
+
+# 추가
+#include <vector>
+#include <iostream>
+using namespace std;
+
+class Vect {
+    vector<int> vect;
+public:
+    void push(int x) {
+        vect.push_back(x);
+    }
+
+    bool operator == (Vect& v) { 
+        int num = 0;
+        for (int i = 0; i < v.vect.size(); i++)
+        {
+            if (this->vect[i] == v.vect[i]) {
+                num++;
+                if (num == this->vect.size()) {
+                    return true;
+                }
+            }
+            else {
+                return false;
+            }
+        }
+    }
+    void print() {
+        cout << vect[0] << endl;
+    }
+};
+
+int main()
+{
+    Vect v1;
+    v1.push(10);
+
+    Vect v2;
+    v2.push(20);
+
+    bool num = v1 == v2; 
+    cout << num << endl; 
+    v1.print(); // v1객체의 벡터의 0번째 요소 값 출력
+    v2.print(); // v2객체의 벡터의 0번째 요소 값 출력
+}
