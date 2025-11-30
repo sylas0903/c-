@@ -1,0 +1,113 @@
+##labs 1
+#include <iostream>
+#include <vector>
+using namespace std;
+
+int main(int argc, char const* argv[])
+{
+    vector<int> v1;
+    for (int i = 0; i < 15; i++) {
+        v1.push_back(i);
+        cout << "capacity: " << v1.capacity() << endl;
+        cout << "size: " << v1.size() << endl;
+    }
+}
+
+##labs 3
+#include <vector>
+#include <iostream>
+using namespace std;
+
+class Shape {
+    int length; // 가로
+     int width; // 세로
+public:
+    Shape(int x, int y) : length(x), width(y) {}
+    void print() {
+        cout << width << ", " << length << "\t";
+    }
+    int area() {
+        return width * length; // 넓이 값을 반환
+    }
+};
+
+int main()
+{
+    vector<Shape> s;
+    Shape squ(5, 5);
+    Shape rect(10, 7);
+    Shape para(8, 4);
+    s.push_back(squ);   // s 벡터에 Shape의 객체들을 저장
+    s.push_back(rect);
+    s.push_back(para);
+
+    vector<Shape>::iterator it;
+    it = s.begin();
+    while (it != s.end()) {
+        it->print();   // 벡터가 가리키는 객체의 print 함수 호출
+        cout << it->area() << endl; // 벡터가 가리키는 객체의 넓이를 구하는 area 함수 호출
+        it++;
+    }
+}
+
+##labs 4
+#include <vector>
+#include <iostream>
+using namespace std;
+
+int main()
+{
+    vector<int> v1(5);
+    v1.push_back(3);
+    v1.push_back(3);
+    v1.push_back(3);
+    v1.push_back(3);
+
+    vector<int>::iterator it;
+    it = v1.begin();
+
+    while (it != v1.end()) {
+        cout << *it << "\t";
+        it++;
+    }
+
+    cout << endl;
+
+    cout << v1.capacity() << endl;
+    cout << v1.size() << endl;
+}
+
+##labs 7
+#include <vector>
+#include <iostream>
+using namespace std;
+
+class Vect {
+    vector<int> vect;
+public:
+    void push(int x) {
+        vect.push_back(x);
+    }
+
+    bool operator != (Vect &v) { // 두 벡터의 0번째 요소 값을 비교하여 같으면 false 다르면 true를 반환하도록 오버로딩
+        return this->vect[0] != v.vect[0];
+    }
+
+    void print() {
+        cout << vect[0] << endl;
+    }
+};
+
+int main()
+{
+    Vect v1;
+    v1.push(10);
+
+    Vect v2;
+    v2.push(10);
+
+    bool num = v1 != v2; // num에 v1,v2 각각의 벡터의 0번째 요소 간 비교 후 반환값 저장
+    cout << num << endl; // 0 반환
+    v1.print(); // v1객체의 벡터의 0번째 요소 값 출력
+    v2.print(); // v2객체의 벡터의 0번째 요소 값 출력
+}
