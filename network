@@ -1,0 +1,127 @@
+#include "..\..\Common.h"
+#include <iostream>
+#include <limits>
+#include <vector>
+#include "헤더.h"
+using namespace std;
+
+#define SERVERPORT 9000
+#define BUFSIZE    512
+
+DWORD WINAPI RecvThread(LPVOID arg) { // 데이터를 수신만 할 스레드 생성
+	SOCKET sock = (SOCKET)arg;
+	char buf[BUFSIZE + 1];
+
+	while (1) {
+		int retval = recvfrom(sock, buf, BUFSIZE, 0, NULL, NULL);
+
+		if (retval == SOCKET_ERROR)
+		{
+			printf("recvfrom() 오류\n");
+			break;
+		}
+
+		buf[retval] = '\0';
+		printf("[받은 내용] %s\n", buf);
+	}
+	return 0;
+}
+
+
+int main(int argc, char* argv[])
+{
+	if (argc < 2) {
+		cout << "인자가 부족합니다" << endl;
+		return 1;
+	}
+
+	int port = atoi(argv[1]);
+	int port2 = atoi(argv[2]);
+
+	int retval;
+
+	cout << "이름을 입력하세요" << endl;
+	string name;
+	cin >> name;
+	cin.ignore(100, '\n');
+
+	int i = 0;
+	int size = sizeof(Members) / sizeof(Members[0]);
+
+	while (i < size) {
+		if (name != Members[i].name) {
+			i++;
+		}
+		else {
+			break;
+		}
+	}
+
+	// 윈속 초기화
+	WSADATA wsa;
+	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+		return 1;
+
+	// 소켓 생성
+	SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock == INVALID_SOCKET) err_quit("socket()");
+
+	// 내 서버의 정보를 저장할 구조체
+	struct sockaddr_in myaddr;
+	memset(&myaddr, 0, sizeof(myaddr));
+	myaddr.sin_family = AF_INET;
+	myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	myaddr.sin_port = htons(port);
+
+	retval = bind(sock, (struct sockaddr*)&myaddr, sizeof(myaddr)); 
+	if (retval == SOCKET_ERROR) err_quit("bind()");
+
+	// 상대쪽 서버의 정보를 담을 구조체
+	struct sockaddr_in serveraddr;
+	memset(&serveraddr, 0, sizeof(serveraddr));
+	serveraddr.sin_family = AF_INET;
+	inet_pton(AF_INET, Members[i].IPAddr.c_str(), &serveraddr.sin_addr);
+	serveraddr.sin_port = htons(port2);
+
+	int addrlen;
+	char buf[BUFSIZE + 1];
+	int len;
+
+	HANDLE Thread = CreateThread(NULL, 0, RecvThread, (LPVOID)sock, 0, NULL); // 스레드 생성
+
+	if (!Thread) {
+		printf("스레드 생성 실패\n");
+	}
+
+	// 서버와 데이터 통신
+	printf("\n[보낼 데이터]\n");
+	while (1) {
+		// 데이터 입력
+		if (fgets(buf, BUFSIZE + 1, stdin) == NULL)
+			break;
+
+		// '\n' 문자 제거
+		len = (int)strlen(buf);
+		if (buf[len - 1] == '\n')
+			buf[len - 1] = '\0';
+		if (strlen(buf) == 0)
+			break;
+
+		// 데이터 보내기
+		retval = sendto(sock, buf, (int)strlen(buf), 0,
+			(struct sockaddr*)&serveraddr, sizeof(serveraddr));
+		if (retval == SOCKET_ERROR) {
+			err_display("sendto()");
+			break;
+		}
+		printf("[UDP 클라이언트] %d바이트를 보냈습니다.\n", retval);
+
+	}
+
+	// 소켓 닫기
+	closesocket(sock);
+
+	// 윈속 종료
+	WSACleanup();
+	return 0;
+}
