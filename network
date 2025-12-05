@@ -610,3 +610,190 @@ int main(int argc, char* argv[]) {
     WSACleanup();
     return 0;
 }
+----------------------------------------------------------- TCP 멀티 채팅
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cstring>
+#include <limits>
+#include <cstdlib>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <conio.h>
+using namespace std;
+
+#define BUF_SIZE 1024
+
+struct Data {
+    vector<SOCKET> sock;
+    vector<sockaddr_in> addr;
+};
+
+int main(int argc, char* argv[]) {
+    int port, port2;
+    if (argc < 2) {
+        port = 9000;
+        port2 = 9001;
+    }
+    else {
+        port = atoi(argv[1]);
+        port2 = atoi(argv[2]);
+    }
+
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        cerr << "WSAStartup 실패\n";
+        return 1;
+    }
+
+    string ip = "42.82.124.241";
+    SOCKET recv_sock = socket(AF_INET, SOCK_STREAM, 0);
+    SOCKET send_sock = socket(AF_INET, SOCK_STREAM, 0);
+    SOCKET sock2;
+    sockaddr_in recv_addr, send_addr;
+    memset(&recv_addr, 0, sizeof(recv_addr));
+    memset(&send_addr, 0, sizeof(send_addr));
+
+    recv_addr.sin_family = AF_INET;
+    inet_pton(AF_INET, ip.c_str(), &recv_addr.sin_addr);
+    recv_addr.sin_port = htons(port);
+
+    send_addr.sin_family = AF_INET;
+    inet_pton(AF_INET, ip.c_str(), &send_addr.sin_addr);
+    send_addr.sin_port = htons(port2);
+
+    Data d;
+
+    if (bind(recv_sock, (sockaddr*)&recv_addr, sizeof(recv_addr)) == SOCKET_ERROR) {
+        cout << "bind() 실패: " << WSAGetLastError() << endl;
+        return 1;
+    }
+
+    if (listen(recv_sock, SOMAXCONN) == SOCKET_ERROR) {
+        cout << "listen() 실패: " << WSAGetLastError() << endl;
+        return 1;
+    }
+
+    char recvbuf[BUF_SIZE + 1];
+    char sendbuf[BUF_SIZE + 1];
+    int sendbuf_len = 0;
+    sendbuf[0] = '\0';
+
+    int addrlen = sizeof(recv_addr);
+    fd_set masterfds;
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_ZERO(&masterfds);
+    FD_SET(recv_sock, &masterfds);
+    FD_SET(send_sock, &masterfds);
+    SOCKET fd_max = max(recv_sock, send_sock);
+
+    cout << "연결을 시도 하시겠습니까? (1: 예, 0: 아니오) ";
+    bool num;
+    cin >> num;
+    if (num != 1) return 1;
+
+    if (connect(send_sock, (sockaddr*)&send_addr, addrlen) == SOCKET_ERROR) {
+        cout << "connect() 실패: " << WSAGetLastError() << endl;
+        return 1;
+    }
+
+    // 기본 전송 소켓 초기화
+    SOCKET target_sock = send_sock;
+
+    while (true) {
+        readfds = masterfds;
+
+        timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 300000;
+
+        int ret = select(0, &readfds, NULL, NULL, &timeout);
+        if (ret == SOCKET_ERROR) {
+            cout << "select() 실패: " << WSAGetLastError() << endl;
+            break;
+        }
+
+        for (SOCKET s = 0; s <= fd_max; s++) {
+            if (!FD_ISSET(s, &readfds)) continue;
+
+            if (s == recv_sock) {
+                sock2 = accept(recv_sock, (sockaddr*)&recv_addr, &addrlen);
+                if (sock2 != INVALID_SOCKET) {
+                    d.sock.push_back(sock2);
+                    d.addr.push_back(recv_addr);
+                    FD_SET(sock2, &masterfds);
+                    if (fd_max < sock2) fd_max = sock2;
+                    cout << "클라이언트 연결됨!" << endl;
+                }
+            }
+            else {
+                int ret = recv(s, recvbuf, sizeof(recvbuf) - 1, 0);
+                if (ret > 0) {
+                    recvbuf[ret] = '\0';
+                    cout << "\n받은 메세지: " << recvbuf << endl;
+                }
+                else if (ret == 0) {
+                    closesocket(s);
+                    FD_CLR(s, &masterfds);
+                    cout << "\n클라이언트 연결 종료" << endl;
+                }
+            }
+        }
+
+        while (_kbhit()) {
+            int ch = _getch();
+            if (ch == '\r') {
+                sendbuf[sendbuf_len] = '\0';
+
+                if (strcmp(sendbuf, "/quit") == 0) {
+                    cout << "\n연결을 종료합니다" << endl;
+                    WSACleanup();
+                    return 0;
+                }
+                else if (strcmp(sendbuf, "/set") == 0) {
+                    if (d.sock.empty()) {
+                        cout << "연결된 클라이언트가 없습니다!" << endl;
+                    }
+                    else {
+                        cout << "연결할 대상을 선택하세요 (0 ~ " << d.sock.size() - 1 << "): ";
+                        int idx;
+                        cin >> idx;
+                        if (idx >= 0 && idx < d.sock.size()) {
+                            target_sock = d.sock[idx];
+                            cout << "대상 변경 완료: 클라이언트 " << idx << endl;
+                        }
+                        else {
+                            cout << "잘못된 선택입니다!" << endl;
+                        }
+                    }
+                }
+                else {
+                    // 선택된 소켓으로 메시지 전송
+                    ret = send(target_sock, sendbuf, strlen(sendbuf), 0);
+                    if (ret == SOCKET_ERROR) {
+                        cout << "send() 실패: " << WSAGetLastError() << endl;
+                    }
+                }
+
+                sendbuf_len = 0;
+                sendbuf[0] = '\0';
+                cout << endl;
+            }
+            else if (ch == 8 && sendbuf_len > 0) {
+                sendbuf_len--;
+                cout << "\b \b";
+            }
+            else {
+                if (sendbuf_len < sizeof(sendbuf) - 1) {
+                    sendbuf[sendbuf_len] = (char)ch;
+                    sendbuf_len++;
+                    cout << (char)ch;
+                }
+            }
+        }
+    }
+
+    WSACleanup();
+    return 0;
+}
