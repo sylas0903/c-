@@ -1,3 +1,5 @@
+// UDP 채팅 프로그램
+
 #include "..\..\Common.h"
 #include <iostream>
 #include <limits>
