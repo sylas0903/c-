@@ -1,4 +1,4 @@
-// UDP 채팅 프로그램
+----------------------------------------------------------------// UDP 채팅 프로그램
 
 #include "..\..\Common.h"
 #include <iostream>
@@ -129,7 +129,8 @@ int main(int argc, char* argv[])
 }
 
 
-//UDP멀티 채팅
+----------------------------------------------------------------//UDP멀티 채팅
+
 #include <iostream>
 #include <string>
 #include <vector>
